@@ -1,0 +1,131 @@
+# -------------------------------------------------------------------
+# Shared Makefile for AIDu Python packages
+#
+# Usage:
+#
+#   PACKAGE=aidu-ai-actor
+#   EXAMPLE=tutor_actor
+#
+#   include ../aidu-dev-tools/python-package.mk
+#
+# -------------------------------------------------------------------
+
+UV=uv
+FIND=find
+
+.PHONY: help install clean wipe run smoke test lint format check-format pre-commit-install pre-commit-run jupyter
+
+help:                                     ## Show this help
+	@grep -h "##" $(MAKEFILE_LIST) | grep -v grep | sed -e "s/\$$//" -e "s/##//"
+
+# -------------------------------------------------------------------
+# Install
+# -------------------------------------------------------------------
+
+install:                                  ## Install dependencies
+	@echo "Installing dependencies"
+	@$(UV) sync
+
+	@echo "Upgrading pip"
+	@$(UV) run python -m ensurepip --upgrade
+
+# -------------------------------------------------------------------
+# Cleanup
+# -------------------------------------------------------------------
+
+clean:                                    ## Clean temporary and cache files
+	rm -rf .pytest_cache
+	rm -rf .coverage
+	rm -rf htmlcov
+	rm -rf .venv
+
+	$(FIND) . -type f -name '*~' -delete
+	$(FIND) . -type f -name '*.pyc' -delete
+	$(FIND) . -type d -name '__pycache__' -delete
+
+wipe: clean                               ## Delete all uv-related files
+	@echo "Removing uv.lock"
+	rm -f uv.lock
+
+# -------------------------------------------------------------------
+# Run examples
+# -------------------------------------------------------------------
+
+run:                                      ## Run an example (e.g. make run EXAMPLE=tutor_agent)
+ifndef EXAMPLE
+	@echo "No EXAMPLE specified. Usage: make run EXAMPLE=example_name"
+else
+	@echo "Running example: $(EXAMPLE)"
+	$(UV) run python -m $(EXAMPLE)
+endif
+
+# -------------------------------------------------------------------
+# Smoke Tests
+# -------------------------------------------------------------------
+
+smoke:                                    ## Run all smoke modules
+ifndef SMOKE_MODULES
+	@echo "No SMOKE_MODULES defined"
+else
+	@for module in $(SMOKE_MODULES); do \
+		echo "Running $$module"; \
+		$(UV) run python -m $$module || exit 1; \
+	done
+endif
+
+# -------------------------------------------------------------------
+# Testing
+# -------------------------------------------------------------------
+
+test:                                     ## Run all tests
+	$(UV) run pytest
+
+# -------------------------------------------------------------------
+# Linting / Formatting
+# -------------------------------------------------------------------
+
+lint:                                     ## Run ruff linting
+	$(UV) run ruff check src tests || true
+
+format:                                   ## Format code
+	$(UV) run black .
+	$(UV) run ruff format .
+
+
+check-format:                             ## Check formatting
+	$(UV) run black --check .
+	$(UV) run ruff check .
+
+# -------------------------------------------------------------------
+# Pre-commit
+# -------------------------------------------------------------------
+
+pre-commit-install:                       ## Install pre-commit hooks
+	$(UV) run pip install pre-commit
+	$(UV) run pre-commit install
+
+pre-commit-run:                           ## Run pre-commit checks
+	$(UV) run pre-commit run --all-files
+
+# -------------------------------------------------------------------
+# Jupyter
+# -------------------------------------------------------------------
+
+jupyter:                                  ## Start Jupyter Lab
+	@if [ ! -d ".venv" ]; then uv venv; fi
+	uv pip install jupyter
+	uv run jupyter lab
+
+# -------------------------------------------------------------------
+# Publishing
+# -------------------------------------------------------------------
+build:                                    ## Build package artifacts
+	-$(MAKE) web.build
+
+	rm -rf dist
+	$(UV) build
+
+publish: build                            ## Publish the package to PyPI
+	@echo "Publishing package..."
+	@. ~/.env && uv publish --token "$$PYPI_TOKEN"
+
