@@ -38,10 +38,12 @@ clean:                                    ## Clean temporary and cache files
 	rm -rf .coverage
 	rm -rf htmlcov
 	rm -rf .venv
+	rm -rf web/node_modules
 
 	$(FIND) . -type f -name '*~' -delete
 	$(FIND) . -type f -name '*.pyc' -delete
 	$(FIND) . -type d -name '__pycache__' -delete
+	$(FIND) . -type d -name 'dist' -prune -exec rm -rf {} +
 
 wipe: clean                               ## Delete all uv-related files
 	@echo "Removing uv.lock"
@@ -72,6 +74,16 @@ else
 		$(UV) run python -m $$module || exit 1; \
 	done
 endif
+
+# -------------------------------------------------------------------
+# Embedded Frontend
+# -------------------------------------------------------------------
+
+web-build:                                   ## Build the embedded frontend
+	@echo "Building embedded frontend"
+	@cd web && npm install && npm run build
+	@cp -r web/dist/* $(WEB_DIST_DIR)
+
 
 # -------------------------------------------------------------------
 # Testing

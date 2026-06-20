@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# ensure ERR trap is inherited by subshells
+set -o errtrace
+
+# Report failing command and line when the script exits due to an error
+trap 'rc=$?; echo "ERROR: command failed with exit $rc: \"$BASH_COMMAND\" at line ${LINENO}" >&2' ERR
 
 usage() {
   cat <<EOF
@@ -42,8 +47,12 @@ for d in "$parent_dir"/*/; do
 
   # check if this directory is inside a git work tree
   if git -C "$d" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    # local working tree status
-    status=$(git -C "$d" status --porcelain)
+    # local working tree status; handle git failures gracefully
+    if ! status=$(git -C "$d" status --porcelain 2>/dev/null); then
+      echo "Error: failed to run 'git status' in ${d%/}" >&2
+      any_dirty=1
+      continue
+    fi
 
     # determine push status: does branch have an upstream and are there unpushed commits?
     pushed_ok=1
@@ -62,11 +71,11 @@ for d in "$parent_dir"/*/; do
       push_msg="no upstream configured"
     fi
 
-    if [[ -n "$status" || $pushed_ok -eq 0 ]]; then
+      if [[ -n "$status" || $pushed_ok -eq 0 ]]; then
       any_dirty=1
       echo "[DIR DIRTY] ${d%/}"
       if [[ -n "$status" ]]; then
-        git -C "$d" status --short
+        git -C "$d" status --short || true
       fi
       if [[ $pushed_ok -eq 0 ]]; then
         echo "-- Push state: $push_msg"
