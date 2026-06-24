@@ -82,6 +82,7 @@ endif
 web-build:                                   ## Build the embedded frontend
 	@echo "Building embedded frontend"
 	@cd web && npm install && npm run build
+	@mkdir -p $(WEB_DIST_DIR)
 	@cp -r web/dist/* $(WEB_DIST_DIR)
 
 

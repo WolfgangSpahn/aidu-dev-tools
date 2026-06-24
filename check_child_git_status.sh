@@ -60,11 +60,22 @@ for d in "$parent_dir"/*/; do
 
     # try to get the upstream; if none, treat as not pushed
     if git -C "$d" rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1; then
+      # fetch remote refs so we can detect if remote is ahead (needs pull)
+      git -C "$d" fetch --quiet --all 2>/dev/null || true
+
       # compute ahead/behind counts
       read behind ahead < <(git -C "$d" rev-list --left-right --count @{u}...HEAD 2>/dev/null || echo "0 0")
+      # build a combined push/remote status message when needed
+      push_parts=()
       if [[ $ahead -gt 0 ]]; then
+        push_parts+=("un-pushed commits (ahead=$ahead)")
+      fi
+      if [[ $behind -gt 0 ]]; then
+        push_parts+=("remote has new commits (behind=$behind)")
+      fi
+      if [[ ${#push_parts[@]} -gt 0 ]]; then
         pushed_ok=0
-        push_msg="un-pushed commits (ahead=$ahead)"
+        push_msg="${push_parts[*]}"
       fi
     else
       pushed_ok=0
@@ -79,6 +90,13 @@ for d in "$parent_dir"/*/; do
       fi
       if [[ $pushed_ok -eq 0 ]]; then
         echo "-- Push state: $push_msg"
+        # if remote is ahead, show commits and file changes on the remote so additions are visible
+        if [[ $behind -gt 0 ]]; then
+          echo "-- Commits on remote (to pull):"
+          git -C "$d" --no-pager log --oneline HEAD..@{u} || true
+          echo "-- Files changed on remote (to pull):"
+          git -C "$d" diff --name-status HEAD..@{u} || true
+        fi
       fi
       echo
     else
