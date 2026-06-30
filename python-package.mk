@@ -18,6 +18,11 @@ FIND=find
 help:                                     ## Show this help
 	@grep -h "##" $(MAKEFILE_LIST) | grep -v grep | sed -e "s/\$$//" -e "s/##//"
 
+AIDU_DEV_TOOLS_DIR := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
+DEV_ROOT ?= $(AIDU_DEV_TOOLS_DIR)
+include $(DEV_ROOT)/.codex/codex-utils.mk
+
+
 # -------------------------------------------------------------------
 # Install
 # -------------------------------------------------------------------
@@ -141,4 +146,3 @@ build:                                    ## Build package artifacts
 publish: build                            ## Publish the package to PyPI
 	@echo "Publishing package..."
 	@. ~/.env && uv publish --token "$$PYPI_TOKEN"
-
