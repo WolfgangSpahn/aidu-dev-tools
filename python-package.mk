@@ -12,6 +12,8 @@
 
 UV=uv
 FIND=find
+DEBUG ?= False
+RUN_DEBUG=$(if $(filter 1 True true TRUE yes YES y Y on ON,$(DEBUG)),True,False)
 
 .PHONY: help install clean wipe run smoke test lint format check-format pre-commit-install pre-commit-run jupyter
 
@@ -58,12 +60,12 @@ wipe: clean                               ## Delete all uv-related files
 # Run examples
 # -------------------------------------------------------------------
 
-run:                                      ## Run an example (e.g. make run EXAMPLE=tutor_agent)
+run:                                      ## Run an example (e.g. make run EXAMPLE=tutor_agent DEBUG=True)
 ifndef EXAMPLE
 	@echo "No EXAMPLE specified. Usage: make run EXAMPLE=example_name"
 else
 	@echo "Running example: $(EXAMPLE)"
-	$(UV) run python -m $(EXAMPLE)
+	AIDU_DEBUG=$(RUN_DEBUG) $(UV) run python -m $(EXAMPLE)
 endif
 
 # -------------------------------------------------------------------

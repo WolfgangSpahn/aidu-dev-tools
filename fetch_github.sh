@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -u
+set -o pipefail
 
 usage() {
   cat <<EOF
 Usage: ${0##*/} [DIR]
 
-Force-resets all immediate child Git repositories of DIR to their upstream branch.
+Force-resets all immediate child Git repositories of DIR to their remote branch.
 
-Remote is treated as the master/source of truth.
+Remote is treated as the source of truth.
 Local state is discarded completely.
 
 This script modifies only local repositories.
@@ -15,6 +16,7 @@ It never pushes and never changes the remote.
 
 Effects per repo:
   - fetch remote refs
+  - ensure the current branch has a usable upstream if possible
   - reset current local branch to its upstream branch
   - delete untracked files
   - delete ignored files
@@ -71,19 +73,44 @@ for d in "$parent_dir"/*/; do
     continue
   fi
 
-  if ! upstream="$(git -C "$d" rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)"; then
-    echo "[SKIP] Branch '$branch' has no upstream configured"
-    any_skipped=1
+  echo "[BRANCH] $branch"
+
+  if ! git -C "$d" remote get-url origin >/dev/null 2>&1; then
+    echo "[FAIL] No remote named 'origin'"
+    any_failed=1
     continue
   fi
 
-  echo "[REMOTE MASTER] $upstream"
   echo "[FETCH] Updating remote-tracking refs"
 
-  if ! git -C "$d" fetch --quiet --prune; then
-    echo "[FAIL] fetch failed"
+  if ! git -C "$d" fetch origin --quiet --prune; then
+    echo "[FAIL] fetch origin failed"
     any_failed=1
     continue
+  fi
+
+  upstream=""
+
+  if upstream="$(git -C "$d" rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)"; then
+    echo "[UPSTREAM] Existing upstream: $upstream"
+  else
+    candidate="origin/$branch"
+
+    if git -C "$d" show-ref --verify --quiet "refs/remotes/$candidate"; then
+      echo "[UPSTREAM] Missing upstream. Setting '$branch' -> '$candidate'"
+
+      if ! git -C "$d" branch --set-upstream-to="$candidate" "$branch"; then
+        echo "[FAIL] Could not set upstream to '$candidate'"
+        any_failed=1
+        continue
+      fi
+
+      upstream="$candidate"
+    else
+      echo "[FAIL] Branch '$branch' has no upstream and '$candidate' does not exist"
+      any_failed=1
+      continue
+    fi
   fi
 
   echo "[RESET] Forcing local '$branch' to exactly match '$upstream'"
@@ -102,7 +129,7 @@ for d in "$parent_dir"/*/; do
     continue
   fi
 
-  echo "[OK] Local repo now matches remote upstream"
+  echo "[OK] Local repo now matches $upstream"
 done
 
 echo
