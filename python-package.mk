@@ -12,8 +12,12 @@
 
 UV=uv
 FIND=find
+DEBUG_TRUE_VALUES=1 True true TRUE yes YES y Y on ON
 DEBUG ?= False
-RUN_DEBUG=$(if $(filter 1 True true TRUE yes YES y Y on ON,$(DEBUG)),True,False)
+# Prefer explicit AIDU_DEBUG (set by package Makefiles) and fall back to DEBUG.
+AIDU_DEBUG ?= $(if $(filter $(DEBUG_TRUE_VALUES),$(DEBUG)),1,0)
+RUN_DEBUG=$(if $(filter $(DEBUG_TRUE_VALUES),$(AIDU_DEBUG) $(DEBUG)),True,False)
+RUN_AIDU_DEBUG=$(if $(filter $(DEBUG_TRUE_VALUES),$(AIDU_DEBUG) $(DEBUG)),1,0)
 
 .PHONY: help install clean wipe run smoke test lint format check-format pre-commit-install pre-commit-run jupyter
 
@@ -65,7 +69,17 @@ ifndef EXAMPLE
 	@echo "No EXAMPLE specified. Usage: make run EXAMPLE=example_name"
 else
 	@echo "Running example: $(EXAMPLE)"
-	AIDU_DEBUG=$(RUN_DEBUG) $(UV) run python -m $(EXAMPLE)
+	@if [ "$(EXAMPLE)" = "aidu.backend.app" ]; then \
+		RELOAD_DIR_ARGS=""; \
+		for dir in $(RUN_RELOAD_DIRS); do \
+			if [ -d "$$dir" ]; then \
+				RELOAD_DIR_ARGS="$$RELOAD_DIR_ARGS --reload-dir $$dir"; \
+			fi; \
+		done; \
+		AIDU_DEBUG=$(RUN_AIDU_DEBUG) $(UV) run uvicorn aidu.backend.app:app --host 127.0.0.1 --port 8000 --reload $$RELOAD_DIR_ARGS --log-level warning --no-access-log; \
+	else \
+		AIDU_DEBUG=$(RUN_AIDU_DEBUG) $(UV) run python -m $(EXAMPLE); \
+	fi
 endif
 
 # -------------------------------------------------------------------
