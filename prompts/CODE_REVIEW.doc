@@ -1,0 +1,282 @@
+# CODE_REVIEW.md
+
+## Purpose
+
+The goal of code review is to identify:
+
+* correctness problems;
+* unclear ownership;
+* duplicated responsibility;
+* unnecessary complexity;
+* and refactoring opportunities at the root cause.
+
+Do not overwhelm the reviewer with a long list of optional improvements.
+
+Prioritize only issues that materially affect correctness, architecture, or maintainability.
+
+## Review order
+
+Review in this order:
+
+1. understand and document the current design;
+2. establish a smoke test;
+3. identify the root cause of relevant problems;
+4. propose the smallest coherent refactoring;
+5. implement only when explicitly requested.
+
+## 1. Documentation first
+
+Before proposing structural changes, inspect the affected module, its callers, tests, and related types.
+
+Add or improve concise docstrings for relevant modules, classes, and non-obvious functions.
+
+Docstrings should explain:
+
+* the purpose of the code;
+* the responsibility it owns;
+* important constraints and invariants;
+* why the implementation is more complex than an obvious simpler alternative;
+* which surrounding components depend on the behavior.
+
+Document design intent, not implementation line by line.
+
+Do not add docstrings to trivial functions whose name and type signature already explain their behavior.
+
+Do not invent intent. When the reason for a design cannot be established from code, tests, call sites, or existing documentation, state that uncertainty.
+
+Documentation should describe the current design before refactoring changes it.
+
+## 2. Smoke test first
+
+Before refactoring a behavior-owning Python module, establish a small deterministic smoke test for its primary responsibility.
+
+The smoke test should:
+
+* exercise one representative public path;
+* use local deterministic inputs;
+* avoid real network calls, external services, databases, and paid APIs;
+* use fakes or stubs at external boundaries;
+* assert a small number of essential outcomes;
+* complete quickly;
+* remain valid while internal implementation changes.
+
+Where appropriate, place the smoke test in the module:
+
+```python
+def _smoke_test() -> None:
+    ...
+
+
+if __name__ == "__main__":
+    _smoke_test()
+```
+
+For modules whose `__main__` starts a server, CLI, worker, or other operational process, place the smoke test under:
+
+```text
+tests/smoke/test_<module_name>.py
+```
+
+Run the smoke test before and after each coherent refactoring slice.
+
+Do not weaken the smoke test merely to make a refactoring pass.
+
+Pure declaration modules, such as constants, exceptions, or simple models, may be covered by the nearest consuming module's smoke test.
+
+## 3. Fix the root cause
+
+Identify the layer that owns the incorrect behavior or violated invariant.
+
+Fix the problem in that owning layer.
+
+Do not add a higher-layer workaround when a lower layer is producing invalid behavior.
+
+Examples of undesirable workarounds include:
+
+* filtering invalid backend values in the UI;
+* inspecting HTTP status codes in domain logic;
+* repairing state after persistence instead of preventing invalid persistence;
+* adding caller-specific conditionals around generally incorrect behavior;
+* duplicating validation in several layers;
+* adding retries or delays that hide lifecycle or ordering defects.
+
+A higher-layer solution is appropriate only when that layer owns presentation, compatibility, policy, or user interaction.
+
+Ask:
+
+> Would the underlying incorrect behavior still be available to another caller?
+
+If yes, the proposed change is probably not at the root cause.
+
+## 4. Keep one owner for each concept
+
+Every important concept should have one clear owner.
+
+This includes:
+
+* mutable state;
+* domain rules;
+* lifecycle control;
+* validation rules;
+* and system-wide entities.
+
+Do not maintain competing authoritative copies of the same state.
+
+Do not duplicate the same rule in several callers.
+
+Do not introduce helper functions merely to share duplicated lines when the real problem is duplicated responsibility.
+
+## 5. Canonical system-wide entities
+
+A Pydantic type with system-wide semantic meaning must have one canonical definition.
+
+Canonical system-wide entities belong in the shared core model layer, currently:
+
+```text
+aidu-ai-llm/core
+```
+
+Examples may include:
+
+* `Message`;
+* `Artifact`;
+* `Context`;
+* `AgentResult`;
+* `Recommendation`;
+* `Evidence`;
+* `Belief`;
+* `SessionState`.
+
+Before introducing or modifying a Pydantic model, search for existing models with the same meaning, lifecycle, invariants, or serialization role.
+
+Do not create equivalent or nearly equivalent system-wide entities in different packages.
+
+Not every Pydantic model belongs in `core`.
+
+The following may remain close to their owning boundary:
+
+* HTTP request and response schemas;
+* persistence schemas;
+* provider-specific payloads;
+* configuration models;
+* adapter-specific representations;
+* temporary parsing structures.
+
+The deciding question is:
+
+> Does this type represent a stable concept used across subsystem boundaries, or a representation owned by one interface?
+
+Stable cross-system concepts belong in `core`.
+
+Boundary-specific schemas remain near their boundary and convert explicitly to and from canonical entities.
+
+## 6. Keep technical details at boundaries
+
+Framework-specific details must remain in the layer that owns them.
+
+Examples:
+
+* HTTP status codes and URLs belong in HTTP adapters;
+* database exceptions and rows belong in persistence adapters;
+* provider payloads belong in provider clients;
+* UI event formats belong in the frontend boundary.
+
+Translate technical failures into semantic application or domain exceptions at the boundary.
+
+Prefer:
+
+```text
+requests.HTTPError
+→ backend adapter
+→ BackendSessionNotFound
+→ application behavior
+```
+
+over:
+
+```text
+requests.HTTPError
+→ worker inspects URL and status code
+```
+
+Core domain types and logic must not depend on FastAPI, database implementations, UI frameworks, or provider SDKs.
+
+## 7. Encapsulate state changes
+
+The component that owns state should also own its valid mutations.
+
+Prefer:
+
+```python
+student.record_error(error)
+session.apply_patch(patch)
+worker.stop()
+```
+
+over:
+
+```python
+student.status.last_error = str(error)
+session.state.update(patch)
+worker.running = False
+```
+
+External callers should invoke behavior rather than manipulate internal state directly.
+
+Read access should return values or snapshots where practical.
+
+## 8. Smallest coherent refactoring
+
+Prefer the smallest coherent root-cause change.
+
+Do not optimize for the smallest number of changed lines.
+
+A good refactoring slice should:
+
+* improve one responsibility boundary;
+* preserve behavior unless an intentional change is stated;
+* include or update the relevant smoke test;
+* remove the obsolete workaround made unnecessary by the change;
+* leave the codebase working.
+
+Do not combine unrelated cleanup, renaming, file movement, formatting, and behavioral changes in one patch.
+
+Do not introduce a new class, service, abstraction, or module unless it:
+
+* clarifies ownership;
+* removes duplicated responsibility;
+* establishes a meaningful contract;
+* or materially improves testability.
+
+Do not split files solely because they are long.
+
+## Review output
+
+For each substantive finding, report:
+
+1. **Problem**
+2. **Evidence**
+3. **Owning layer**
+4. **Root cause**
+5. **Smallest coherent correction**
+6. **Smoke test or verification needed**
+
+Classify findings as:
+
+* correctness;
+* architecture;
+* maintainability;
+* performance;
+* security.
+
+Do not report stylistic preferences as defects unless they violate an established project rule or materially reduce maintainability.
+
+Do not list speculative issues without a plausible failure path.
+
+Do not list optional cleanup when more important findings exist.
+
+If no substantive issue is found, state that clearly and mention any remaining uncertainty.
+
+## Review-only rule
+
+During code review, do not modify files unless implementation is explicitly requested.
