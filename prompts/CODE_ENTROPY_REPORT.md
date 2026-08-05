@@ -2,7 +2,7 @@
 
 Inspect the repository and create or update:
 
-`docs/architecture/concept-<scope>-inventory.md`
+`aidu-ai-llm/docs/architecture/concept-aidu-ai-llm_core-inventory_prior.md`
 
 The file is the persistent source of truth for the current conceptual structure of the inspected subsystem.
 
@@ -10,7 +10,7 @@ The file is the persistent source of truth for the current conceptual structure 
 
 Inspect:
 
-`<SCOPE>`
+`aidu-ai-llm/src/aidu/ai/core`
 
 Use source code, tests, schemas, configuration, documentation, API contracts, state types, adapters, and relevant entry points.
 
@@ -18,7 +18,7 @@ Do not edit application code during this task.
 
 ## File handling
 
-If `docs/architecture/concept-inventory.md` already exists:
+If `aidu-ai-llm/docs/architecture/concept-aidu-ai-llm_core-inventory.md` already exists:
 
 1. Read it before inspecting the code.
 2. Verify every existing claim against the current repository.
@@ -270,7 +270,7 @@ Search explicitly for:
 
 ## Constraints
 
-* Modify only `docs/architecture/concept-inventory.md`.
+* Modify only `aidu-ai-llm/docs/architecture/concept-aidu-ai-llm_core-inventory.md`.
 * Do not edit application code.
 * Do not propose a generic framework.
 * Do not reduce findings to naming or file organization.

@@ -2,13 +2,13 @@
 
 Clean up the following concept through its complete implementation depth:
 
-`<CONCEPT_ID> — <CONCEPT_NAME>`
+| 1 | CON-002 | Most central compatibility boundary: strict message, enriched dict, provider dict, flattened session payload, and routed event all compete | CON-010 terminology and boundary understood | Introduce a typed persisted-turn record and migrate `Messages` plus adapters |
 
 The authoritative inventory is:
 
-`docs/architecture/concept-inventory.md`
+'aidu-ai-llm/docs/architecture/concept-aidu-ai-llm_core-inventory.md'
 
-Read the complete inventory entry for `<CONCEPT_ID>` before inspecting or editing code.
+Read the complete inventory entry for `CON-002` before inspecting or editing code.
 
 The objective is to reduce the number of representations, execution paths, owners, compatibility branches, and abstractions associated with this concept while preserving required observable behaviour.
 
@@ -20,11 +20,11 @@ Do not merely rename, move, wrap, reorganize, or generalize duplicated structure
 
 Primary scope:
 
-`<SCOPE>`
+`AIDU-NG/aidu-ai-llm`
 
 Related repositories, packages, or directories that may need inspection:
 
-`<RELATED_SCOPE>`
+`AIDU-NG/` python packages
 
 Do not modify unrelated concepts unless a small change is strictly required to complete this consolidation. Report such changes explicitly.
 

@@ -19,13 +19,15 @@ AIDU_DEBUG ?= $(if $(filter $(DEBUG_TRUE_VALUES),$(DEBUG)),1,0)
 RUN_DEBUG=$(if $(filter $(DEBUG_TRUE_VALUES),$(AIDU_DEBUG) $(DEBUG)),True,False)
 RUN_AIDU_DEBUG=$(if $(filter $(DEBUG_TRUE_VALUES),$(AIDU_DEBUG) $(DEBUG)),1,0)
 
-.PHONY: help install clean wipe run run-example smoke test lint format check-format pre-commit-install pre-commit-run jupyter
+.PHONY: help install clean wipe run dev reset-dev-db run-example smoke test lint format check-format pre-commit-install pre-commit-run jupyter
 
 help:                                     ## Show this help
 	@grep -h "##" $(MAKEFILE_LIST) | grep -v grep | sed -e "s/\$$//" -e "s/##//"
 
 AIDU_DEV_TOOLS_DIR := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
 DEV_ROOT ?= $(AIDU_DEV_TOOLS_DIR)
+AIDU_DATA_DIR ?= $(abspath $(AIDU_DEV_TOOLS_DIR)/../aidu-data)
+AIDU_DB_FILE ?= $(AIDU_DATA_DIR)/data.db
 include $(DEV_ROOT)/.codex/codex-utils.mk
 
 
@@ -68,6 +70,14 @@ wipe: clean                               ## Delete all uv-related files
 RUN_HOOK ?= run-example
 
 run: $(RUN_HOOK)                          ## Run an example (e.g. make run EXAMPLE=tutor_agent DEBUG=True)
+
+dev: reset-dev-db run                     ## Reset the development database, then run
+
+reset-dev-db:
+	@test "$(notdir $(AIDU_DB_FILE))" = "data.db"
+	@test -d "$(AIDU_DATA_DIR)"
+	@echo "Resetting development database: $(AIDU_DB_FILE)"
+	@rm -f "$(AIDU_DB_FILE)" "$(AIDU_DB_FILE)-wal" "$(AIDU_DB_FILE)-shm"
 
 run-example:
 ifndef EXAMPLE
