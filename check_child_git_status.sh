@@ -35,7 +35,8 @@ usage() {
   cat <<EOF
 Usage: ${0##*/} [DIR]
 
-Checks Git status for each immediate child directory of DIR.
+Checks Git status for DIR itself (when it is a repository) and each immediate
+child directory of DIR, except directories reserved for root-repository files.
 If DIR is omitted, the current directory is used.
 
 A repository is considered SYNCED when:
@@ -78,14 +79,23 @@ any_problem=0
 
 shopt -s nullglob
 
-for d in "$parent_dir"/*/; do
-  [[ -d "$d" ]] || continue
-
-  repo="${d%/}"
+check_repo() {
+  local d="$1"
+  local display_name="${2:-${d%/}}"
+  local repo branch upstream status ahead behind has_problem prefix
+  repo="$display_name"
 
   if ! git -C "$d" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     warn "[NO GIT] $repo"
-    continue
+    return
+  fi
+
+  # Git also recognizes ordinary subdirectories as part of their parent
+  # repository. Only check a directory here when it is the repository root.
+  prefix="$(git -C "$d" rev-parse --show-prefix 2>/dev/null || true)"
+  if [[ -n "$prefix" ]]; then
+    warn "[NO GIT] $repo"
+    return
   fi
 
   echo
@@ -96,19 +106,19 @@ for d in "$parent_dir"/*/; do
   if [[ -z "$branch" ]]; then
     bad "[PROBLEM] Detached HEAD"
     any_problem=1
-    continue
+    return
   fi
 
   if ! upstream="$(git -C "$d" rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)"; then
     bad "[PROBLEM] Branch '$branch' has no upstream configured"
     any_problem=1
-    continue
+    return
   fi
 
   if ! status="$(git -C "$d" status --porcelain 2>/dev/null)"; then
     bad "[PROBLEM] Failed to read working tree status"
     any_problem=1
-    continue
+    return
   fi
 
   info "[BRANCH]   $branch"
@@ -117,7 +127,7 @@ for d in "$parent_dir"/*/; do
   if ! git -C "$d" fetch --quiet --prune; then
     bad "[PROBLEM] Fetch failed"
     any_problem=1
-    continue
+    return
   fi
 
   read behind ahead < <(
@@ -164,6 +174,31 @@ for d in "$parent_dir"/*/; do
   else
     any_problem=1
   fi
+}
+
+# Include the root repository, when DIR itself is one.
+if git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  check_repo "$parent_dir" "aidu-ng"
+fi
+
+# These directories belong to the root repository, but are not package repos.
+excluded_dirs=(.vscode Manuals Workspace assessments tmp)
+
+for d in "$parent_dir"/*/; do
+  [[ -d "$d" ]] || continue
+
+  child_name="${d%/}"
+  child_name="${child_name##*/}"
+  skip_child=0
+  for excluded in "${excluded_dirs[@]}"; do
+    if [[ "$child_name" == "$excluded" ]]; then
+      skip_child=1
+      break
+    fi
+  done
+  [[ "$skip_child" -eq 1 ]] && continue
+
+  check_repo "$d"
 done
 
 echo
