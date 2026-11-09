@@ -236,6 +236,8 @@ echo "  ${green}Already up to date:   $any_clean${reset}"
 echo "  ${yellow}Need attention:       $any_attention${reset}"
 echo "  ${red}Failed:               $any_failed${reset}"
 echo "  ${yellow}Non-git folders seen: $any_no_git${reset}"
+echo
+echo "${yellow}The database is still the old data.db; run 'make restore' in aidu-data to make the pulled data.sqlite.xz effective.${reset}"
 
 if [[ "$any_failed" -ne 0 ]]; then
   echo
